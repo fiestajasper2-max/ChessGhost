@@ -1,3 +1,5 @@
+// app/src/main/java/com/chessghost/app/OverlayService.kt
+
 package com.chessghost.app
 
 import android.app.*
@@ -30,10 +32,8 @@ class OverlayService : Service() {
         private const val REFRESH_MS    = 500L
     }
 
-    // Android 14 requires a callback registered BEFORE createVirtualDisplay()
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
-            // System stopped the projection (user revoked, phone locked, etc.)
             serviceScope.cancel()
             try { virtualDisplay.release() } catch (_: Exception) {}
             try { imageReader.close() }     catch (_: Exception) {}
@@ -50,11 +50,8 @@ class OverlayService : Service() {
         val data = intent.getParcelableExtra<Intent>("data")
             ?: return START_NOT_STICKY
 
-        val projManager =
-            getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val projManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         projection = projManager.getMediaProjection(resultCode, data)
-
-        // MUST be called before createVirtualDisplay() on Android 14+
         projection.registerCallback(projectionCallback, mainHandler)
 
         engine  = StockfishEngine(this).also { it.start() }
@@ -64,30 +61,25 @@ class OverlayService : Service() {
         val screenW = metrics.widthPixels
         val screenH = metrics.heightPixels
 
-        imageReader = ImageReader.newInstance(
-            screenW, screenH, PixelFormat.RGBA_8888, 2
-        )
+        imageReader = ImageReader.newInstance(screenW, screenH, PixelFormat.RGBA_8888, 2)
 
         virtualDisplay = projection.createVirtualDisplay(
             "ChessGhostVD",
             screenW, screenH, metrics.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader.surface,
-            null,
-            mainHandler
+            imageReader.surface, null, mainHandler
         )
 
-        startAnalysisLoop(screenW, screenH)
+        startAnalysisLoop()
         return START_NOT_STICKY
     }
 
-    private fun startAnalysisLoop(screenW: Int, screenH: Int) {
+    private fun startAnalysisLoop() {
         serviceScope.launch {
             while (isActive) {
                 delay(REFRESH_MS)
 
-                val image = imageReader.acquireLatestImage()
-                if (image == null) continue
+                val image = imageReader.acquireLatestImage() ?: continue
 
                 val bitmap: Bitmap
                 try {
@@ -96,7 +88,6 @@ class OverlayService : Service() {
                     val rowStride = plane.rowStride
                     val pixStride = plane.pixelStride
                     val padding   = rowStride - pixStride * image.width
-
                     bitmap = Bitmap.createBitmap(
                         image.width + padding / pixStride,
                         image.height,
@@ -107,10 +98,11 @@ class OverlayService : Service() {
                     image.close()
                 }
 
-                val fen = BoardParser.parse(bitmap)
+                val result = BoardParser.parseWithBounds(bitmap)
                 bitmap.recycle()
-                if (fen == null) continue
+                if (result == null) continue
 
+                val (fen, bounds) = result
                 val best = engine.bestMove(fen)
                 if (best.length < 4) continue
 
@@ -118,7 +110,7 @@ class OverlayService : Service() {
                 val to   = uciToCell(best.substring(2, 4))
 
                 withContext(Dispatchers.Main) {
-                    overlay.drawMove(from, to, screenW, screenH)
+                    overlay.drawMove(from, to, bounds[0], bounds[1], bounds[2])
                 }
             }
         }
@@ -146,15 +138,10 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?) = null
 
     private fun buildNotification(): Notification {
-        val manager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (manager.getNotificationChannel(NOTIF_CHANNEL) == null) {
             manager.createNotificationChannel(
-                NotificationChannel(
-                    NOTIF_CHANNEL,
-                    "ChessGhost",
-                    NotificationManager.IMPORTANCE_LOW
-                )
+                NotificationChannel(NOTIF_CHANNEL, "ChessGhost", NotificationManager.IMPORTANCE_LOW)
             )
         }
         return NotificationCompat.Builder(this, NOTIF_CHANNEL)
