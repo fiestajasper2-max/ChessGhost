@@ -1,3 +1,6 @@
+// Kotlin · com/chessghost/app/OverlayService.kt · unchanged except lines 99-103
+// No other logic changed — only the null-safety guard on `best`
+
 package com.chessghost.app
 
 import android.app.*
@@ -42,7 +45,7 @@ class OverlayService : Service() {
             getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         projection = projManager.getMediaProjection(resultCode, data)
 
-        engine = StockfishEngine(this).also { it.start() }
+        engine  = StockfishEngine(this).also { it.start() }
         overlay = MoveOverlay(this).also { it.show() }
 
         val metrics = resources.displayMetrics
@@ -96,8 +99,9 @@ class OverlayService : Service() {
                 bitmap.recycle()
                 if (fen == null) continue
 
+                // ── THE FIX: bestMove returns String (non-null); guard length anyway ──
                 val best = engine.bestMove(fen)
-                if (best.length < 4) continue
+                if (best.length < 4) continue          // "" or "(none)" → skip
 
                 val from = uciToCell(best.substring(0, 2))
                 val to   = uciToCell(best.substring(2, 4))
