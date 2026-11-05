@@ -1,6 +1,6 @@
-// Kotlin · com/chessghost/app/StockfishEngine.kt · Android API 21+
-// bestMove returns String (non-null, "" on failure) — matches OverlayService usage
-// chmod fix included — was the original runtime error=13
+// Kotlin · com/chessghost/app/StockfishEngine.kt
+// Reads binary from nativeLibraryDir (always executable) instead of filesDir (never executable on SELinux)
+// No chmod, no setExecutable — Android handles it automatically for .so files
 
 package com.chessghost.app
 
@@ -16,12 +16,19 @@ class StockfishEngine(private val context: Context) {
     private var reader: BufferedReader? = null
 
     companion object {
-        private const val DEPTH       = 20
-        private const val BINARY_NAME = "stockfish"
+        private const val DEPTH   = 20
+        // Must match the filename in jniLibs/arm64-v8a/libstockfish.so
+        private const val LIB_NAME = "libstockfish.so"
     }
 
     fun start() {
-        val binary = copyBinaryIfNeeded()
+        // nativeLibraryDir = /data/app/com.chessghost.app-xxx/lib/arm64
+        // Android extracts .so files there at install time with 755 — always executable
+        val binary = File(context.applicationInfo.nativeLibraryDir, LIB_NAME)
+        check(binary.exists()) {
+            "stockfish binary not found at ${binary.absolutePath} — ensure libstockfish.so is in jniLibs/arm64-v8a/"
+        }
+
         process = ProcessBuilder(binary.absolutePath)
             .redirectErrorStream(true)
             .start()
@@ -42,7 +49,6 @@ class StockfishEngine(private val context: Context) {
         }
     }
 
-    // Returns "" on failure — OverlayService checks length < 4 to skip bad results
     suspend fun bestMove(fen: String): String = withContext(Dispatchers.IO) {
         if (process == null || writer == null || reader == null) return@withContext ""
 
@@ -73,33 +79,13 @@ class StockfishEngine(private val context: Context) {
             writer?.close()
             reader?.close()
             process?.destroy()
-            writer = null
-            reader = null
+            writer  = null
+            reader  = null
             process = null
         }
     }
 
     private fun send(cmd: String) {
         writer?.println(cmd)
-    }
-
-    private fun copyBinaryIfNeeded(): File {
-        val dest = File(context.filesDir, BINARY_NAME)
-        if (!dest.exists()) {
-            context.assets.open(BINARY_NAME).use { input ->
-                dest.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-        }
-        // setExecutable(true, false) = owner+group+other; fixes runtime error=13
-        if (!dest.canExecute()) {
-            val ok = dest.setExecutable(true, false)
-            if (!ok) {
-                // fallback for hardened MIUI / SELinux builds
-                Runtime.getRuntime().exec(arrayOf("chmod", "755", dest.absolutePath)).waitFor()
-            }
-        }
-        return dest
     }
 }
