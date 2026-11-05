@@ -1,3 +1,4 @@
+# .github/workflows/build.yml
 name: Build ChessGhost APK
 
 on:
@@ -37,7 +38,9 @@ jobs:
           find . -name "stockfish*" -not -name "*.tar" -not -name "*.yml" -type f \
             | head -1 \
             | xargs -I{} cp {} app/src/main/jniLibs/arm64-v8a/libstockfish.so
+          echo "--- verify ---"
           ls -lh app/src/main/jniLibs/arm64-v8a/libstockfish.so
+          file app/src/main/jniLibs/arm64-v8a/libstockfish.so
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
