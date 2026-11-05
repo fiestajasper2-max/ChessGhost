@@ -1,4 +1,4 @@
-// app/build.gradle — add abiFilters + jniLibs source set + disable .so compression
+// app/build.gradle
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
@@ -16,24 +16,16 @@ android {
         versionName "1.0"
         base.archivesName = "Chess-bot"
 
-        // Only package the ABI your stockfish binary is built for
-        // Change to "armeabi-v7a" or add "x86_64" if you have those builds
         ndk {
             abiFilters "arm64-v8a"
         }
     }
 
-    // Tell Gradle where jniLibs live (default path, explicit is safer)
-    sourceSets {
-        main {
-            jniLibs.srcDirs = ['src/main/jniLibs']
-        }
-    }
-
-    // Do NOT compress .so files — required for direct execution from nativeLibraryDir
     packagingOptions {
         jniLibs {
-            useLegacyPackaging = false
+            // Force installer to extract .so to nativeLibraryDir on disk
+            // Without this, minSdk>=23 keeps .so inside the APK and nativeLibraryDir is empty
+            useLegacyPackaging true
         }
     }
 
