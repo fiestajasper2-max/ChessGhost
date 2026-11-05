@@ -29,18 +29,19 @@ jobs:
 
       - name: Download Stockfish ARM64 binary
         run: |
-          mkdir -p app/src/main/assets
+          # Place binary in jniLibs — Android extracts .so files with 755 at install time,
+          # bypassing the SELinux restriction that blocks exec from filesDir/assets
+          mkdir -p app/src/main/jniLibs/arm64-v8a
           curl -L \
             "https://github.com/official-stockfish/Stockfish/releases/download/sf_16.1/stockfish-android-armv8.tar" \
             -o sf.tar
           tar -xf sf.tar
-          find . -name "stockfish*" -not -name "*.tar" -type f \
+          find . -name "stockfish*" -not -name "*.tar" -not -name "*.yml" -type f \
             | head -1 \
-            | xargs -I{} cp {} app/src/main/assets/stockfish
-          chmod +x app/src/main/assets/stockfish
+            | xargs -I{} cp {} app/src/main/jniLibs/arm64-v8a/libstockfish.so
           echo "--- verify binary ---"
-          ls -lh app/src/main/assets/stockfish
-          file app/src/main/assets/stockfish
+          ls -lh app/src/main/jniLibs/arm64-v8a/libstockfish.so
+          file app/src/main/jniLibs/arm64-v8a/libstockfish.so
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
