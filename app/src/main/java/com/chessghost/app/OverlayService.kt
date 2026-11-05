@@ -26,6 +26,10 @@ class OverlayService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mainHandler  = Handler(Looper.getMainLooper())
 
+    // Real screen dimensions — stored once, used to fix the row-stride padding bug
+    private var screenW = 0
+    private var screenH = 0
+
     companion object {
         private const val NOTIF_CHANNEL = "chessghost_channel"
         private const val NOTIF_ID      = 42
@@ -58,8 +62,8 @@ class OverlayService : Service() {
         overlay = MoveOverlay(this).also { it.show() }
 
         val metrics = resources.displayMetrics
-        val screenW = metrics.widthPixels
-        val screenH = metrics.heightPixels
+        screenW = metrics.widthPixels
+        screenH = metrics.heightPixels
 
         imageReader = ImageReader.newInstance(screenW, screenH, PixelFormat.RGBA_8888, 2)
 
@@ -88,6 +92,9 @@ class OverlayService : Service() {
                     val rowStride = plane.rowStride
                     val pixStride = plane.pixelStride
                     val padding   = rowStride - pixStride * image.width
+
+                    // bitmap.width = image.width + padding/pixStride (wider than screen due to stride)
+                    // We pass screenW separately so BoardParser uses the real screen width
                     bitmap = Bitmap.createBitmap(
                         image.width + padding / pixStride,
                         image.height,
@@ -98,7 +105,8 @@ class OverlayService : Service() {
                     image.close()
                 }
 
-                val result = BoardParser.parseWithBounds(bitmap)
+                // Pass screenW — NOT bitmap.width — so cell detection is correct
+                val result = BoardParser.parseWithBounds(bitmap, screenW)
                 bitmap.recycle()
                 if (result == null) continue
 
