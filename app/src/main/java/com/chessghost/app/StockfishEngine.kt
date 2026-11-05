@@ -1,6 +1,4 @@
-// Kotlin · com/chessghost/app/StockfishEngine.kt
-// Reads binary from nativeLibraryDir (always executable) instead of filesDir (never executable on SELinux)
-// No chmod, no setExecutable — Android handles it automatically for .so files
+// app/src/main/java/com/chessghost/app/StockfishEngine.kt
 
 package com.chessghost.app
 
@@ -16,14 +14,11 @@ class StockfishEngine(private val context: Context) {
     private var reader: BufferedReader? = null
 
     companion object {
-        private const val DEPTH   = 20
-        // Must match the filename in jniLibs/arm64-v8a/libstockfish.so
+        private const val DEPTH    = 20
         private const val LIB_NAME = "libstockfish.so"
     }
 
     fun start() {
-        // nativeLibraryDir = /data/app/com.chessghost.app-xxx/lib/arm64
-        // Android extracts .so files there at install time with 755 — always executable
         val binary = File(context.applicationInfo.nativeLibraryDir, LIB_NAME)
         check(binary.exists()) {
             "stockfish binary not found at ${binary.absolutePath} — ensure libstockfish.so is in jniLibs/arm64-v8a/"
@@ -33,9 +28,7 @@ class StockfishEngine(private val context: Context) {
             .redirectErrorStream(true)
             .start()
 
-        writer = PrintWriter(
-            BufferedWriter(OutputStreamWriter(process!!.outputStream)), true
-        )
+        writer = PrintWriter(BufferedWriter(OutputStreamWriter(process!!.outputStream)), true)
         reader = BufferedReader(InputStreamReader(process!!.inputStream))
 
         send("uci")
@@ -61,9 +54,7 @@ class StockfishEngine(private val context: Context) {
         while (reader!!.readLine().also { line = it } != null) {
             if (line!!.startsWith("bestmove")) {
                 val parts = line!!.split(" ")
-                if (parts.size >= 2 && parts[1] != "(none)") {
-                    result = parts[1]
-                }
+                if (parts.size >= 2 && parts[1] != "(none)") result = parts[1]
                 break
             }
         }
@@ -79,13 +70,9 @@ class StockfishEngine(private val context: Context) {
             writer?.close()
             reader?.close()
             process?.destroy()
-            writer  = null
-            reader  = null
-            process = null
+            writer = null; reader = null; process = null
         }
     }
 
-    private fun send(cmd: String) {
-        writer?.println(cmd)
-    }
+    private fun send(cmd: String) { writer?.println(cmd) }
 }
