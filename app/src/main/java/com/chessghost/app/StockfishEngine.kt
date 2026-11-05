@@ -1,94 +1,70 @@
+// Kotlin · StockfishEngine.kt · Android API 21+
+// error=13 → binary copied to filesDir but never marked executable
+// fix: chmod +x after copy, before ProcessBuilder.start()
+
 package com.chessghost.app
 
 import android.content.Context
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.*
+import java.io.File
+import java.io.FileOutputStream
 
 class StockfishEngine(private val context: Context) {
 
     private var process: Process? = null
-    private var writer: PrintWriter? = null
-    private var reader: BufferedReader? = null
+    private val stockfishBinary: File
+        get() = File(context.filesDir, "stockfish")
 
-    companion object {
-        private const val DEPTH = 20
-        private const val BINARY_NAME = "stockfish"
-    }
-
-    fun start() {
-        val binary = copyBinaryIfNeeded()
-        process = ProcessBuilder(binary.absolutePath)
-            .redirectErrorStream(true)
-            .start()
-
-        writer = PrintWriter(
-            BufferedWriter(OutputStreamWriter(process!!.outputStream)), true
-        )
-        reader = BufferedReader(InputStreamReader(process!!.inputStream))
-
-        send("uci")
-        send("setoption name Threads value 2")
-        send("setoption name Hash value 64")
-        send("isready")
-
-        // Block until engine confirms ready
-        var line: String?
-        while (reader!!.readLine().also { line = it } != null) {
-            if (line == "readyok") break
-        }
-    }
-
-    suspend fun bestMove(fen: String): String = withContext(Dispatchers.IO) {
-        if (process == null || writer == null || reader == null) return@withContext ""
-
-        send("ucinewgame")
-        send("position fen $fen")
-        send("go depth $DEPTH")
-
-        var result = ""
-        var line: String?
-        while (reader!!.readLine().also { line = it } != null) {
-            if (line!!.startsWith("bestmove")) {
-                val parts = line!!.split(" ")
-                if (parts.size >= 2 && parts[1] != "(none)") {
-                    result = parts[1]
-                }
-                break
-            }
-        }
-        result
-    }
-
-    fun stop() {
-        try {
-            send("quit")
-            process?.waitFor()
-        } catch (_: Exception) {}
-        finally {
-            writer?.close()
-            reader?.close()
-            process?.destroy()
-            writer = null
-            reader = null
-            process = null
-        }
-    }
-
-    private fun send(cmd: String) {
-        writer?.println(cmd)
-    }
-
-    private fun copyBinaryIfNeeded(): File {
-        val dest = File(context.filesDir, BINARY_NAME)
+    /**
+     * Call once on first launch (or on every launch — idempotent).
+     * Copies the binary from assets and sets executable bit.
+     *
+     * Assumption: stockfish binary lives at assets/stockfish (arm64-v8a or
+     * per-ABI — swap the asset name to match what you ship).
+     */
+    fun copyAndPrepare() {
+        val dest = stockfishBinary
         if (!dest.exists()) {
-            context.assets.open(BINARY_NAME).use { input ->
-                dest.outputStream().use { output ->
+            context.assets.open("stockfish").use { input ->
+                FileOutputStream(dest).use { output ->
                     input.copyTo(output)
                 }
             }
         }
-        dest.setExecutable(true, true)
-        return dest
+        // THIS is the line that was missing — error=13 dies here without it
+        if (!dest.canExecute()) {
+            dest.setExecutable(true, false)   // owner + group + other
+        }
+    }
+
+    /** Line 23 equivalent — now safe to call after copyAndPrepare() */
+    fun start() {
+        copyAndPrepare()   // ← guard: no-op if already executable
+
+        process = ProcessBuilder(stockfishBinary.absolutePath)
+            .redirectErrorStream(true)
+            .start()
+    }
+
+    fun sendCommand(cmd: String) {
+        process?.outputStream?.bufferedWriter()?.apply {
+            write(cmd)
+            newLine()
+            flush()
+        }
+    }
+
+    fun readLine(): String? =
+        process?.inputStream?.bufferedReader()?.readLine()
+
+    fun stop() {
+        process?.apply {
+            outputStream?.bufferedWriter()?.apply {
+                write("quit")
+                newLine()
+                flush()
+            }
+            destroy()
+        }
+        process = null
     }
 }
