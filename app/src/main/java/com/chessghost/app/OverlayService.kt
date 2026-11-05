@@ -10,7 +10,6 @@ import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.*
-import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 
@@ -72,27 +71,32 @@ class OverlayService : Service() {
             while (isActive) {
                 delay(REFRESH_MS)
 
-                val image = imageReader.acquireLatestImage() ?: continue
-                val bitmap: Bitmap = try {
+                val image = imageReader.acquireLatestImage()
+                if (image == null) continue
+
+                val bitmap: Bitmap
+                try {
                     val plane     = image.planes[0]
                     val buffer    = plane.buffer
                     val rowStride = plane.rowStride
                     val pixStride = plane.pixelStride
                     val padding   = rowStride - pixStride * image.width
 
-                    Bitmap.createBitmap(
+                    bitmap = Bitmap.createBitmap(
                         image.width + padding / pixStride,
                         image.height,
                         Bitmap.Config.ARGB_8888
-                    ).also { bmp -> bmp.copyPixelsFromBuffer(buffer) }
+                    )
+                    bitmap.copyPixelsFromBuffer(buffer)
                 } finally {
                     image.close()
                 }
 
-                val fen  = BoardParser.parse(bitmap) ?: run { bitmap.recycle(); continue }
-                val best = engine.bestMove(fen)
+                val fen = BoardParser.parse(bitmap)
                 bitmap.recycle()
+                if (fen == null) continue
 
+                val best = engine.bestMove(fen)
                 if (best.length < 4) continue
 
                 val from = uciToCell(best.substring(0, 2))
@@ -105,10 +109,9 @@ class OverlayService : Service() {
         }
     }
 
-    // "e2" → Pair(col=4, row=6)  (0-based, top-left origin)
     private fun uciToCell(sq: String): Pair<Int, Int> {
-        val col = sq[0] - 'a'           // a=0 … h=7
-        val row = 8 - (sq[1] - '0')    // rank 8=row 0, rank 1=row 7
+        val col = sq[0] - 'a'
+        val row = 8 - (sq[1] - '0')
         return Pair(col, row)
     }
 
