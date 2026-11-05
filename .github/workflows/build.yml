@@ -48,13 +48,13 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
-      - name: Rename APK
+      - name: Rename and collect APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/Chess-bot.apk
+          APK=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -1)
+          echo "Found APK: $APK"
+          cp "$APK" dist/Chess-bot.apk
+          ls -lh dist/Chess-bot.apk
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Chess-bot
-          path: dist/Chess-bot.apk
+        uses: action
