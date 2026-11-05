@@ -19,22 +19,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
       - name: Download Stockfish ARM64 binary
         run: |
           mkdir -p app/src/main/assets
-          curl -L "https://github.com/official-stockfish/Stockfish/releases/download/sf_16/stockfish-android-armv8.zip" -o sf.zip
-          unzip sf.zip
-          find . -name "stockfish*" -type f ! -name "*.zip" | head -1 | xargs -I{} mv {} app/src/main/assets/stockfish
+          curl -L \
+            "https://github.com/official-stockfish/Stockfish/releases/download/sf_16.1/stockfish-android-armv8.tar" \
+            -o sf.tar
+          tar -xf sf.tar
+          find . -name "stockfish_*armv8*" -o -name "stockfish-android-armv8" \
+            | grep -v ".tar" | head -1 \
+            | xargs -I{} cp {} app/src/main/assets/stockfish
           chmod +x app/src/main/assets/stockfish
+          echo "--- binary check ---"
+          ls -lh app/src/main/assets/stockfish
+          file app/src/main/assets/stockfish
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-
-      - name: Generate gradlew if missing
-        run: |
-          if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.2
-          fi
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
@@ -43,4 +47,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ChessGhost-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/Chess-ghost.apk
