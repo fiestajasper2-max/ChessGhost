@@ -19,8 +19,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
+      - name: Install Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
+
+      - name: Generate Gradle wrapper
+        run: gradle wrapper --gradle-version 8.2 --distribution-type bin
 
       - name: Download Stockfish ARM64 binary
         run: |
@@ -29,11 +34,11 @@ jobs:
             "https://github.com/official-stockfish/Stockfish/releases/download/sf_16.1/stockfish-android-armv8.tar" \
             -o sf.tar
           tar -xf sf.tar
-          find . -name "stockfish_*armv8*" -o -name "stockfish-android-armv8" \
-            | grep -v ".tar" | head -1 \
+          find . -name "stockfish*" -not -name "*.tar" -type f \
+            | head -1 \
             | xargs -I{} cp {} app/src/main/assets/stockfish
           chmod +x app/src/main/assets/stockfish
-          echo "--- binary check ---"
+          echo "--- verify binary ---"
           ls -lh app/src/main/assets/stockfish
           file app/src/main/assets/stockfish
 
@@ -47,4 +52,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ChessGhost-debug
-          path: app/build/outputs/apk/debug/Chess-ghost.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
