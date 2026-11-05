@@ -1,3 +1,4 @@
+# .github/workflows/build.yml
 name: Build ChessGhost APK
 
 on:
@@ -37,7 +38,6 @@ jobs:
           find . -name "stockfish*" -not -name "*.tar" -not -name "*.yml" -type f \
             | head -1 \
             | xargs -I{} cp {} app/src/main/jniLibs/arm64-v8a/libstockfish.so
-          # Strip debug symbols — shrinks binary from ~80MB to ~5MB, kills the OOM
           strip --strip-unneeded app/src/main/jniLibs/arm64-v8a/libstockfish.so || true
           echo "--- verify ---"
           ls -lh app/src/main/jniLibs/arm64-v8a/libstockfish.so
