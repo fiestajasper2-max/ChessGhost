@@ -1,4 +1,3 @@
-# .github/workflows/build.yml
 name: Build ChessGhost APK
 
 on:
@@ -38,6 +37,8 @@ jobs:
           find . -name "stockfish*" -not -name "*.tar" -not -name "*.yml" -type f \
             | head -1 \
             | xargs -I{} cp {} app/src/main/jniLibs/arm64-v8a/libstockfish.so
+          # Strip debug symbols — shrinks binary from ~80MB to ~5MB, kills the OOM
+          strip --strip-unneeded app/src/main/jniLibs/arm64-v8a/libstockfish.so || true
           echo "--- verify ---"
           ls -lh app/src/main/jniLibs/arm64-v8a/libstockfish.so
           file app/src/main/jniLibs/arm64-v8a/libstockfish.so
@@ -47,6 +48,8 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
+        env:
+          GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=512m"
 
       - name: Rename and collect APK
         run: |
