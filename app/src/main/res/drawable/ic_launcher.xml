@@ -5,7 +5,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Dark background -->
+    <!-- Background -->
     <path
         android:fillColor="#0D0D0D"
         android:pathData="M0,0 L108,0 L108,108 L0,108 Z"/>
@@ -15,39 +15,33 @@
         android:fillColor="#00FF88"
         android:pathData="M54,15 C36,15 24,28 24,44 L24,82 L32,76 L40,82 L48,76 L54,82 L60,76 L68,82 L76,76 L84,82 L84,44 C84,28 72,15 54,15 Z"/>
 
-    <!-- Left eye -->
-    <ellipse
-        android:fillColor="#0D0D0D"
-        android:centerX="43"
-        android:centerY="47"
-        android:radiusX="5"
-        android:radiusY="6"/>
-
-    <!-- Right eye -->
-    <ellipse
-        android:fillColor="#0D0D0D"
-        android:centerX="65"
-        android:centerY="47"
-        android:radiusX="5"
-        android:radiusY="6"/>
-
-    <!-- Center eye (the judgemental one) -->
-    <ellipse
-        android:fillColor="#0D0D0D"
-        android:centerX="54"
-        android:centerY="44"
-        android:radiusX="3"
-        android:radiusY="4"/>
-
-    <!-- Chess knight symbol -->
+    <!-- Left eye (circle via path) -->
     <path
         android:fillColor="#0D0D0D"
-        android:pathData="M46,58 L46,54 Q46,50 50,48 Q54,46 58,48 Q62,50 62,54 L62,58 L58,58 L58,55 Q58,52 54,52 Q50,52 50,55 L50,58 Z"/>
-    <rect
+        android:pathData="M43,41 m-5,0 a5,6 0 1,0 10,0 a5,6 0 1,0 -10,0"/>
+
+    <!-- Right eye (circle via path) -->
+    <path
         android:fillColor="#0D0D0D"
-        android:left="44"
-        android:top="58"
-        android:right="64"
-        android:bottom="62"/>
+        android:pathData="M65,41 m-5,0 a5,6 0 1,0 10,0 a5,6 0 1,0 -10,0"/>
+
+    <!-- Centre judgemental eye (circle via path) -->
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M54,38 m-3,0 a3,4 0 1,0 6,0 a3,4 0 1,0 -6,0"/>
+
+    <!-- Chess pawn head -->
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M54,52 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0"/>
+
+    <!-- Chess pawn neck + base -->
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M51,57 L57,57 L57,63 L51,63 Z"/>
+
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M47,63 L61,63 L61,66 L47,66 Z"/>
 
 </vector>
