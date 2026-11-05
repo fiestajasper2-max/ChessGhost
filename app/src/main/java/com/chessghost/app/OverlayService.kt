@@ -1,6 +1,3 @@
-// Kotlin · com/chessghost/app/OverlayService.kt · unchanged except lines 99-103
-// No other logic changed — only the null-safety guard on `best`
-
 package com.chessghost.app
 
 import android.app.*
@@ -33,17 +30,32 @@ class OverlayService : Service() {
         private const val REFRESH_MS    = 500L
     }
 
+    // Android 14 requires a callback registered BEFORE createVirtualDisplay()
+    private val projectionCallback = object : MediaProjection.Callback() {
+        override fun onStop() {
+            // System stopped the projection (user revoked, phone locked, etc.)
+            serviceScope.cancel()
+            try { virtualDisplay.release() } catch (_: Exception) {}
+            try { imageReader.close() }     catch (_: Exception) {}
+            stopSelf()
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(NOTIF_ID, buildNotification())
 
         val resultCode = intent?.getIntExtra("resultCode", Activity.RESULT_CANCELED)
             ?: return START_NOT_STICKY
+        @Suppress("DEPRECATION")
         val data = intent.getParcelableExtra<Intent>("data")
             ?: return START_NOT_STICKY
 
         val projManager =
             getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         projection = projManager.getMediaProjection(resultCode, data)
+
+        // MUST be called before createVirtualDisplay() on Android 14+
+        projection.registerCallback(projectionCallback, mainHandler)
 
         engine  = StockfishEngine(this).also { it.start() }
         overlay = MoveOverlay(this).also { it.show() }
@@ -99,9 +111,8 @@ class OverlayService : Service() {
                 bitmap.recycle()
                 if (fen == null) continue
 
-                // ── THE FIX: bestMove returns String (non-null); guard length anyway ──
                 val best = engine.bestMove(fen)
-                if (best.length < 4) continue          // "" or "(none)" → skip
+                if (best.length < 4) continue
 
                 val from = uciToCell(best.substring(0, 2))
                 val to   = uciToCell(best.substring(2, 4))
@@ -124,6 +135,7 @@ class OverlayService : Service() {
         overlay.hide()
         engine.stop()
         try {
+            projection.unregisterCallback(projectionCallback)
             virtualDisplay.release()
             projection.stop()
             imageReader.close()
