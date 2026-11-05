@@ -1,5 +1,3 @@
-// app/src/main/java/com/chessghost/app/BoardParser.kt
-
 package com.chessghost.app
 
 import android.graphics.Bitmap
@@ -8,9 +6,10 @@ import kotlin.math.*
 
 object BoardParser {
 
-    private const val LIGHT_R = 238; private const val LIGHT_G = 238; private const val LIGHT_B = 210
-    private const val DARK_R  = 118; private const val DARK_G  = 150; private const val DARK_B  = 86
-    private const val COLOR_TOLERANCE = 35
+    // Sampled from Sam's actual Chess.com screenshot — brown/tan "Wood" theme
+    private const val LIGHT_R = 240; private const val LIGHT_G = 217; private const val LIGHT_B = 181
+    private const val DARK_R  = 181; private const val DARK_G  = 136; private const val DARK_B  = 99
+    private const val COLOR_TOLERANCE = 40
 
     @Volatile var playerIsWhite: Boolean = true
         private set
@@ -39,17 +38,22 @@ object BoardParser {
     private fun findBoard(bmp: Bitmap): Triple<Int, Int, Int>? {
         val w = bmp.width
         val h = bmp.height
-        val minCell = h / 14
-        val maxCell = w / 8
+
+        // Board is roughly square, fills screen width on Chess.com mobile
+        // Cell size range: board spans ~full width, so cell ≈ w/8
+        val minCell = w / 12
+        val maxCell = w / 7
 
         var bestScore = 0
         var bestX = 0; var bestY = 0; var bestCell = 0
 
-        for (cellPx in maxCell downTo minCell step max(1, (maxCell - minCell) / 12)) {
+        // Fine scan — step by 2px for accuracy
+        for (cellPx in maxCell downTo minCell step max(1, (maxCell - minCell) / 16)) {
             val boardSide = cellPx * 8
             if (boardSide > w || boardSide > h) continue
-            for (startY in 0 until (h - boardSide) step max(4, cellPx / 4)) {
-                for (startX in 0 until (w - boardSide) step max(4, cellPx / 4)) {
+
+            for (startY in 0 until (h - boardSide) step 2) {
+                for (startX in 0 until (w - boardSide) step 2) {
                     val score = scoreGrid(bmp, startX, startY, cellPx)
                     if (score > bestScore) {
                         bestScore = score
@@ -59,21 +63,29 @@ object BoardParser {
             }
         }
 
-        if (bestScore < 32) return null
+        if (bestScore < 40) return null
         return Triple(bestX, bestY, bestCell * 8)
     }
 
     private fun scoreGrid(bmp: Bitmap, startX: Int, startY: Int, cellPx: Int): Int {
         var score = 0
+        // Sample 3x3 points per cell instead of just center — more robust
+        val offsets = listOf(0.25f, 0.5f, 0.75f)
         for (row in 0 until 8) {
             for (col in 0 until 8) {
-                val cx = startX + col * cellPx + cellPx / 2
-                val cy = startY + row * cellPx + cellPx / 2
-                if (cx >= bmp.width || cy >= bmp.height) continue
-                val px = bmp.getPixel(cx, cy)
                 val expectLight = (row + col) % 2 == 0
-                if (expectLight && isLightSquare(px)) score++
-                else if (!expectLight && isDarkSquare(px)) score++
+                var cellScore = 0
+                for (ox in offsets) {
+                    for (oy in offsets) {
+                        val cx = (startX + col * cellPx + ox * cellPx).toInt().coerceIn(0, bmp.width - 1)
+                        val cy = (startY + row * cellPx + oy * cellPx).toInt().coerceIn(0, bmp.height - 1)
+                        val px = bmp.getPixel(cx, cy)
+                        if (expectLight && isLightSquare(px)) cellScore++
+                        else if (!expectLight && isDarkSquare(px)) cellScore++
+                    }
+                }
+                // Cell counts only if majority of samples match
+                if (cellScore >= 5) score++
             }
         }
         return score
@@ -99,7 +111,7 @@ object BoardParser {
         val bgR = if (isLightSquare) LIGHT_R else DARK_R
         val bgG = if (isLightSquare) LIGHT_G else DARK_G
         val bgB = if (isLightSquare) LIGHT_B else DARK_B
-        val radius = (cellPx * 0.30f).toInt().coerceAtLeast(2)
+        val radius = (cellPx * 0.32f).toInt().coerceAtLeast(2)
 
         var whitePx = 0; var blackPx = 0; var total = 0
 
@@ -114,8 +126,8 @@ object BoardParser {
                 if (colorDist(r, g, b, bgR, bgG, bgB) < COLOR_TOLERANCE) continue
                 val lum = r * 0.299 + g * 0.587 + b * 0.114
                 when {
-                    lum > 180 -> whitePx++
-                    lum < 80  -> blackPx++
+                    lum > 190 -> whitePx++
+                    lum < 90  -> blackPx++
                 }
             }
         }
@@ -124,8 +136,8 @@ object BoardParser {
         val wr = whitePx.toFloat() / total
         val br = blackPx.toFloat() / total
         return when {
-            wr > 0.08f && wr > br * 1.5f -> 'P'
-            br > 0.08f && br > wr * 1.5f -> 'p'
+            wr > 0.07f && wr > br * 1.4f -> 'P'
+            br > 0.07f && br > wr * 1.4f -> 'p'
             else -> '.'
         }
     }
